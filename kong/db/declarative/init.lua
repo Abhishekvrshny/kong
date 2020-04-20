@@ -155,7 +155,15 @@ function Config:parse_table(dc_table, hash)
     hash = md5(cjson.encode(dc_table))
   end
 
-  return entities, nil, nil, dc_table._format_version, hash
+  local transformations_enabled = dc_table._transformations_enabled
+  if transformations_enabled == nil then
+    transformations_enabled = true
+  end
+
+  return entities, nil, nil,
+         dc_table._format_version,
+         transformations_enabled,
+         hash
 end
 
 
@@ -239,6 +247,7 @@ function declarative.export_from_db(fd)
 
   fd:write(declarative.to_yaml_string({
     _format_version = "1.1",
+    _transformations_enabled = false,
   }))
 
   for _, schema in ipairs(sorted_schemas) do
@@ -291,7 +300,10 @@ function declarative.export_config()
     return nil, err
   end
 
-  local out = { _format_version = "1.1" }
+  local out = {
+    _format_version = "1.1",
+    _transformations_enabled = false,
+  }
 
   for _, schema in ipairs(sorted_schemas) do
     if schema.db_export == false then
