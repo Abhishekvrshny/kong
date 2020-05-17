@@ -51,7 +51,11 @@ function Blueprint:insert_n(n, overrides, options)
 end
 
 
-local function new_blueprint(dao, build_function)
+local Blueprints  = {}
+Blueprints.__index = Blueprints
+
+
+function Blueprints:new_blueprint(dao, build_function)
   return setmetatable({
     dao = dao,
     build_function = build_function,
@@ -81,31 +85,29 @@ local _M = {}
 
 
 function _M.new(db)
-  local res = {}
-
   local sni_seq = new_sequence("server-name-%d")
-  res.snis = new_blueprint(db.snis, function(overrides)
+  Blueprints.snis = Blueprints:new_blueprint(db.snis, function(overrides)
     return {
       name        = overrides.name or sni_seq:next(),
-      certificate = overrides.certificate or res.certificates:insert(),
+      certificate = overrides.certificate or Blueprints.certificates:insert(),
     }
   end)
 
-  res.certificates = new_blueprint(db.certificates, function()
+  Blueprints.certificates = Blueprints:new_blueprint(db.certificates, function()
     return {
       cert = ssl_fixtures.cert,
       key  = ssl_fixtures.key,
     }
   end)
 
-  res.ca_certificates = new_blueprint(db.ca_certificates, function()
+  Blueprints.ca_certificates = Blueprints:new_blueprint(db.ca_certificates, function()
     return {
       cert = ssl_fixtures.cert_ca,
     }
   end)
 
   local upstream_name_seq = new_sequence("upstream-%d")
-  res.upstreams = new_blueprint(db.upstreams, function(overrides)
+  Blueprints.upstreams = Blueprints:new_blueprint(db.upstreams, function(overrides)
     local slots = overrides.slots or 100
     local name = overrides.name or upstream_name_seq:next()
     local host_header = overrides.host_header or nil
@@ -119,31 +121,31 @@ function _M.new(db)
 
   local consumer_custom_id_seq = new_sequence("consumer-id-%d")
   local consumer_username_seq = new_sequence("consumer-username-%d")
-  res.consumers = new_blueprint(db.consumers, function()
+  Blueprints.consumers = Blueprints:new_blueprint(db.consumers, function()
     return {
       custom_id = consumer_custom_id_seq:next(),
       username  = consumer_username_seq:next(),
     }
   end)
 
-  res.targets = new_blueprint(db.targets, function(overrides)
+  Blueprints.targets = Blueprints:new_blueprint(db.targets, function(overrides)
     return {
       weight = 10,
-      upstream = overrides.upstream or res.upstreams:insert(),
+      upstream = overrides.upstream or Blueprints.upstreams:insert(),
     }
   end)
 
-  res.plugins = new_blueprint(db.plugins, function()
+  Blueprints.plugins = Blueprints:new_blueprint(db.plugins, function()
     return {}
   end)
 
-  res.routes = new_blueprint(db.routes, function(overrides)
+  Blueprints.routes = Blueprints:new_blueprint(db.routes, function(overrides)
     return {
-      service = overrides.service or res.services:insert(),
+      service = overrides.service or Blueprints.services:insert(),
     }
   end)
 
-  res.services = new_blueprint(db.services, function()
+  Blueprints.services = Blueprints:new_blueprint(db.services, function()
     return {
       protocol = "http",
       host = "127.0.0.1",
@@ -153,7 +155,7 @@ function _M.new(db)
 
   local named_service_name_seq = new_sequence("service-name-%d")
   local named_service_host_seq = new_sequence("service-host-%d.test")
-  res.named_services = new_blueprint(db.services, function()
+  Blueprints.named_services = Blueprints:new_blueprint(db.services, function()
     return {
       protocol = "http",
       name = named_service_name_seq:next(),
@@ -164,15 +166,15 @@ function _M.new(db)
 
   local named_route_name_seq = new_sequence("route-name-%d")
   local named_route_host_seq = new_sequence("route-host-%d.test")
-  res.named_routes = new_blueprint(db.routes, function(overrides)
+  Blueprints.named_routes = Blueprints:new_blueprint(db.routes, function(overrides)
     return {
       name = named_route_name_seq:next(),
       hosts = { named_route_host_seq:next() },
-      service = overrides.service or res.services:insert(),
+      service = overrides.service or Blueprints.services:insert(),
     }
   end)
 
-  res.acl_plugins = new_blueprint(db.plugins, function()
+  Blueprints.acl_plugins = Blueprints:new_blueprint(db.plugins, function()
     return {
       name   = "acl",
       config = {},
@@ -180,13 +182,13 @@ function _M.new(db)
   end)
 
   local acl_group_seq = new_sequence("acl-group-%d")
-  res.acls = new_blueprint(db.acls, function()
+  Blueprints.acls = Blueprints:new_blueprint(db.acls, function()
     return {
       group = acl_group_seq:next(),
     }
   end)
 
-  res.cors_plugins = new_blueprint(db.plugins, function()
+  Blueprints.cors_plugins = Blueprints:new_blueprint(db.plugins, function()
     return {
       name   = "cors",
       config = {
@@ -200,14 +202,14 @@ function _M.new(db)
     }
   end)
 
-  res.loggly_plugins = new_blueprint(db.plugins, function()
+  Blueprints.loggly_plugins = Blueprints:new_blueprint(db.plugins, function()
     return {
       name   = "loggly",
       config = {}, -- all fields have default values already
     }
   end)
 
-  res.tcp_log_plugins = new_blueprint(db.plugins, function()
+  Blueprints.tcp_log_plugins = Blueprints:new_blueprint(db.plugins, function()
     return {
       name   = "tcp-log",
       config = {
@@ -217,7 +219,7 @@ function _M.new(db)
     }
   end)
 
-  res.udp_log_plugins = new_blueprint(db.plugins, function()
+  Blueprints.udp_log_plugins = Blueprints:new_blueprint(db.plugins, function()
     return {
       name   = "udp-log",
       config = {
@@ -227,7 +229,7 @@ function _M.new(db)
     }
   end)
 
-  res.jwt_plugins = new_blueprint(db.plugins, function()
+  Blueprints.jwt_plugins = Blueprints:new_blueprint(db.plugins, function()
     return {
       name   = "jwt",
       config = {},
@@ -235,14 +237,14 @@ function _M.new(db)
   end)
 
   local jwt_key_seq = new_sequence("jwt-key-%d")
-  res.jwt_secrets = new_blueprint(db.jwt_secrets, function()
+  Blueprints.jwt_secrets = Blueprints:new_blueprint(db.jwt_secrets, function()
     return {
       key       = jwt_key_seq:next(),
       secret    = "secret",
     }
   end)
 
-  res.oauth2_plugins = new_blueprint(db.plugins, function()
+  Blueprints.oauth2_plugins = Blueprints:new_blueprint(db.plugins, function()
     return {
       name   = "oauth2",
       config = {
@@ -256,7 +258,7 @@ function _M.new(db)
     }
   end)
 
-  res.oauth2_credentials = new_blueprint(db.oauth2_credentials, function()
+  Blueprints.oauth2_credentials = Blueprints:new_blueprint(db.oauth2_credentials, function()
     return {
       name          = "oauth2 credential",
       client_secret = "secret",
@@ -264,22 +266,22 @@ function _M.new(db)
   end)
 
   local oauth_code_seq = new_sequence("oauth-code-%d")
-  res.oauth2_authorization_codes = new_blueprint(db.oauth2_authorization_codes, function()
+  Blueprints.oauth2_authorization_codes = Blueprints:new_blueprint(db.oauth2_authorization_codes, function()
     return {
       code  = oauth_code_seq:next(),
       scope = "default",
     }
   end)
 
-  res.oauth2_tokens = new_blueprint(db.oauth2_tokens, function()
+  Blueprints.oauth2_tokens = Blueprints:new_blueprint(db.oauth2_tokens, function()
     return {
       token_type = "bearer",
-      expires_in = 1000000000,
+      expiBlueprints_in = 1000000000,
       scope      = "default",
     }
   end)
 
-  res.key_auth_plugins = new_blueprint(db.plugins, function()
+  Blueprints.key_auth_plugins = Blueprints:new_blueprint(db.plugins, function()
     return {
       name   = "key-auth",
       config = {},
@@ -287,17 +289,17 @@ function _M.new(db)
   end)
 
   local keyauth_key_seq = new_sequence("keyauth-key-%d")
-  res.keyauth_credentials = new_blueprint(db.keyauth_credentials, function()
+  Blueprints.keyauth_credentials = Blueprints:new_blueprint(db.keyauth_credentials, function()
     return {
       key = keyauth_key_seq:next(),
     }
   end)
 
-  res.basicauth_credentials = new_blueprint(db.basicauth_credentials, function()
+  Blueprints.basicauth_credentials = Blueprints:new_blueprint(db.basicauth_credentials, function()
     return {}
   end)
 
-  res.hmac_auth_plugins = new_blueprint(db.plugins, function()
+  Blueprints.hmac_auth_plugins = Blueprints:new_blueprint(db.plugins, function()
     return {
       name   = "hmac-auth",
       config = {},
@@ -305,49 +307,50 @@ function _M.new(db)
   end)
 
   local hmac_username_seq = new_sequence("hmac-username-%d")
-  res.hmacauth_credentials = new_blueprint(db.hmacauth_credentials, function()
+  Blueprints.hmacauth_credentials = Blueprints:new_blueprint(db.hmacauth_credentials, function()
     return {
       username = hmac_username_seq:next(),
       secret   = "secret",
     }
   end)
 
-  res.rate_limiting_plugins = new_blueprint(db.plugins, function()
+  Blueprints.rate_limiting_plugins = Blueprints:new_blueprint(db.plugins, function()
     return {
       name   = "rate-limiting",
       config = {},
     }
   end)
 
-  res.response_ratelimiting_plugins = new_blueprint(db.plugins, function()
+  Blueprints.Blueprintsponse_ratelimiting_plugins = Blueprints:new_blueprint(db.plugins, function()
     return {
-      name   = "response-ratelimiting",
+      name   = "Blueprintsponse-ratelimiting",
       config = {},
     }
   end)
 
-  res.datadog_plugins = new_blueprint(db.plugins, function()
+  Blueprints.datadog_plugins = Blueprints:new_blueprint(db.plugins, function()
     return {
       name   = "datadog",
       config = {},
     }
   end)
 
-  res.statsd_plugins = new_blueprint(db.plugins, function()
+  Blueprints.statsd_plugins = Blueprints:new_blueprint(db.plugins, function()
     return {
       name   = "statsd",
       config = {},
     }
   end)
 
-  res.rewriter_plugins = new_blueprint(db.plugins, function()
+  Blueprints.rewriter_plugins = Blueprints:new_blueprint(db.plugins, function()
     return {
       name   = "rewriter",
       config = {},
     }
   end)
 
-  return res
+
+  return Blueprints
 end
 
 return _M
